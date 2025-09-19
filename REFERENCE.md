@@ -125,13 +125,6 @@ The following parameters are available in the `patroni` class:
 * [`watchdog_mode`](#-patroni--watchdog_mode)
 * [`watchdog_device`](#-patroni--watchdog_device)
 * [`watchdog_safety_margin`](#-patroni--watchdog_safety_margin)
-* [`ctl_authentication_username`](#-patroni--ctl_authentication_username)
-* [`ctl_authentication_password`](#-patroni--ctl_authentication_password)
-* [`ctl_insecure`](#-patroni--ctl_insecure)
-* [`ctl_cacert`](#-patroni--ctl_cacert)
-* [`ctl_certfile`](#-patroni--ctl_certfile)
-* [`ctl_keyfile`](#-patroni--ctl_keyfile)
-* [`ctl_keyfile_password`](#-patroni--ctl_keyfile_password)
 * [`manage_postgresql`](#-patroni--manage_postgresql)
 * [`postgresql_version`](#-patroni--postgresql_version)
 * [`package_name`](#-patroni--package_name)
@@ -156,7 +149,6 @@ The following parameters are available in the `patroni` class:
 * [`standby_cluster_port`](#-patroni--standby_cluster_port)
 * [`standby_cluster_primary_slot_name`](#-patroni--standby_cluster_primary_slot_name)
 * [`http_proxy`](#-patroni--http_proxy)
-* [`config_ensure`](#-patroni--config_ensure)
 
 ##### <a name="-patroni--scope"></a>`scope`
 
@@ -979,62 +971,6 @@ Refer to Watchdog configuration `safety_margin` setting
 
 Default value: `5`
 
-##### <a name="-patroni--ctl_authentication_username"></a>`ctl_authentication_username`
-
-Data type: `Optional[String[1]]`
-
-Refer to CTL configuration `authentication.username` setting
-
-Default value: `undef`
-
-##### <a name="-patroni--ctl_authentication_password"></a>`ctl_authentication_password`
-
-Data type: `Optional[String[1]]`
-
-Refer to CTL configuration `authentication.password` setting
-
-Default value: `undef`
-
-##### <a name="-patroni--ctl_insecure"></a>`ctl_insecure`
-
-Data type: `Optional[Boolean]`
-
-Refer to CTL configuration `insecure` setting
-
-Default value: `undef`
-
-##### <a name="-patroni--ctl_cacert"></a>`ctl_cacert`
-
-Data type: `Optional[String[1]]`
-
-Refer to CTL configuration `cacert` setting
-
-Default value: `undef`
-
-##### <a name="-patroni--ctl_certfile"></a>`ctl_certfile`
-
-Data type: `Optional[String[1]]`
-
-Refer to CTL configuration `certfile` setting
-
-Default value: `undef`
-
-##### <a name="-patroni--ctl_keyfile"></a>`ctl_keyfile`
-
-Data type: `Optional[String[1]]`
-
-Refer to CTL configuration `keyfile` setting
-
-Default value: `undef`
-
-##### <a name="-patroni--ctl_keyfile_password"></a>`ctl_keyfile_password`
-
-Data type: `Optional[String[1]]`
-
-Refer to CTL configuration `keyfile_password` setting
-
-Default value: `undef`
-
 ##### <a name="-patroni--manage_postgresql"></a>`manage_postgresql`
 
 Data type: `Boolean`
@@ -1228,14 +1164,6 @@ Data type: `Optional[Stdlib::HTTPUrl]`
 URI for an http(s) proxy, used for pip commands
 
 Default value: `undef`
-
-##### <a name="-patroni--config_ensure"></a>`config_ensure`
-
-Data type: `Enum['file','absent']`
-
-management of the main config. The config isn't required when you run only patroni::instance resources
-
-Default value: `'file'`
 
 ## Resource types
 

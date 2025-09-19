@@ -204,20 +204,6 @@
 #   Refer to Watchdog configuration `device` setting
 # @param watchdog_safety_margin
 #   Refer to Watchdog configuration `safety_margin` setting
-# @param ctl_authentication_username
-#   Refer to CTL configuration `authentication.username` setting
-# @param ctl_authentication_password
-#   Refer to CTL configuration `authentication.password` setting
-# @param ctl_insecure
-#   Refer to CTL configuration `insecure` setting
-# @param ctl_cacert
-#   Refer to CTL configuration `cacert` setting
-# @param ctl_certfile
-#   Refer to CTL configuration `certfile` setting
-# @param ctl_keyfile
-#   Refer to CTL configuration `keyfile` setting
-# @param ctl_keyfile_password
-#   Refer to CTL configuration `keyfile_password` setting
 # @param manage_postgresql
 #   Boolean to determine if postgresql is managed
 # @param postgresql_version
@@ -268,8 +254,14 @@
 #   Refer to Standby configuration `slot` setting
 # @param http_proxy
 #   URI for an http(s) proxy, used for pip commands
-# @param config_ensure management of the main config. The config isn't required when you run only patroni::instance resources
-#
+# @param config_change_action
+#   How to handle changes to patroni configuration file
+#   Gives option to simply reload patroni configuration on changes instead of restarting the service every 
+#   time which might have side effects. Especially as many params dont require a service restart.
+# @param config_change_allow_restart
+#   Allows to restart patroni instance if a param requiring a restart is changed
+# @param pg_dcs_config_entries
+#   Allows to restart patroni instance if a param requiring a restart is changed
 class patroni (
 
   # Global Settings
@@ -401,15 +393,6 @@ class patroni (
   Stdlib::Absolutepath $watchdog_device = '/dev/watchdog',
   Integer $watchdog_safety_margin = 5,
 
-  # CTL Settings
-  Optional[String[1]] $ctl_authentication_username = undef,
-  Optional[String[1]] $ctl_authentication_password = undef,
-  Optional[Boolean]   $ctl_insecure = undef,
-  Optional[String[1]] $ctl_cacert = undef,
-  Optional[String[1]] $ctl_certfile = undef,
-  Optional[String[1]] $ctl_keyfile = undef,
-  Optional[String[1]] $ctl_keyfile_password = undef,
-
   # Module Specific Settings
   Boolean $manage_postgresql = true,
   Optional[String[1]] $postgresql_version = undef,
@@ -431,7 +414,9 @@ class patroni (
   Boolean $service_enable = true,
   Optional[String[1]] $custom_pip_provider = undef,
   Optional[Stdlib::HTTPUrl] $http_proxy = undef,
-  Enum['file','absent'] $config_ensure = 'file',
+  Enum['reload', 'restart'] $config_change_action = 'restart',
+  Boolean $config_change_allow_restart = true,
+  Hash[String, Any] $pg_dcs_config_entries = {},
 ) {
   if $manage_postgresql {
     class { 'postgresql::globals':
@@ -575,14 +560,48 @@ class patroni (
     }
   }
 
+  $patronictl = "${install_dir}/bin/patronictl"
+
+  # $_service_restart = { restart => $_reload_command }
+  $_config_change_notify = if ($config_change_action == 'restart') { Service['patroni'] } else { Exec['patroni_reload'] }
+
+  $pgsql_parameters.each |$key, $value| {
+    patroni_pg_param_config { $key:
+      value  => $value,
+      notify => Exec['patroni_reload'],
+    }
+  }
+
+  exec { 'patroni_reload':
+    command     => "${patronictl} -c ${config_path} reload ${scope} ${hostname} --force",
+    refreshonly => true,
+    require     => Service['patroni'],
+  } ~> exec { 'wait_for_changes_to_take_effect':
+    command     => '/bin/sleep 15',
+    refreshonly => true,
+  }
+  # -> notify { 'patroni_should_restart_pending':
+  #   message => Deferred('should_restart_pending', [$patronictl, $config_path, $hostname]),
+  # }
+  # -> Patroni_dcs_config <||>
+  -> if (Deferred('should_restart_pending', [$patronictl, $config_path, $hostname]) and $config_change_allow_restart) {
+    exec { 'patroni_restart':
+      command     => "/usr/bin/systemctl restart ${service_name}",
+      refreshonly => true,
+    }
+  } else {
+    notify { 'skip': }
+  }
+
   file { 'patroni_config':
-    ensure  => $config_ensure,
+    ensure  => 'file',
     path    => $config_path,
     owner   => $config_owner,
     group   => $config_group,
     mode    => $config_mode,
     content => template('patroni/postgresql.yml.erb'),
-    notify  => Service['patroni'],
+    notify  => $_config_change_notify,
+    # noop    => true,
   }
 
   if $install_method == 'pip' {
@@ -596,9 +615,11 @@ class patroni (
     ensure => $service_ensure,
     name   => $service_name,
     enable => $service_enable,
+    # david
+    # *      => $_service_restart,
   }
 
-  $patronictl = "${install_dir}/bin/patronictl"
+  # $patronictl = "${install_dir}/bin/patronictl"
   patronictl_config { 'puppet':
     path   => $patronictl,
     config => $config_path,
