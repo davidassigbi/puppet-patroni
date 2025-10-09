@@ -269,6 +269,10 @@
 # @param http_proxy
 #   URI for an http(s) proxy, used for pip commands
 # @param config_ensure management of the main config. The config isn't required when you run only patroni::instance resources
+# @param config_change_action
+#   How to handle changes to patroni configuration file
+#   Gives option to simply reload patroni configuration on changes instead of restarting the service every
+#   time which might have side effects. Especially as many params dont require a service restart.
 #
 class patroni (
 
@@ -432,6 +436,7 @@ class patroni (
   Optional[String[1]] $custom_pip_provider = undef,
   Optional[Stdlib::HTTPUrl] $http_proxy = undef,
   Enum['file','absent'] $config_ensure = 'file',
+  Enum['reload', 'restart'] $config_change_action = 'restart',
 ) {
   if $manage_postgresql {
     class { 'postgresql::globals':
@@ -575,6 +580,8 @@ class patroni (
     }
   }
 
+  $_config_change_notify = if $config_change_action == 'restart' { Service['patroni'] } else { Exec['patroni_reload'] }
+
   file { 'patroni_config':
     ensure  => $config_ensure,
     path    => $config_path,
@@ -582,7 +589,7 @@ class patroni (
     group   => $config_group,
     mode    => $config_mode,
     content => template('patroni/postgresql.yml.erb'),
-    notify  => Service['patroni'],
+    notify  => $_config_change_notify,
   }
 
   if $install_method == 'pip' {
@@ -590,6 +597,13 @@ class patroni (
       content => template('patroni/patroni.service.erb'),
       notify  => Service['patroni'],
     }
+  }
+
+  exec { 'patroni_reload':
+    command     => "patronictl -c ${config_path} reload ${scope} ${hostname} --force",
+    refreshonly => true,
+    require     => Service['patroni'],
+    path        => [$install_dir, '/usr/bin'],
   }
 
   service { 'patroni':
